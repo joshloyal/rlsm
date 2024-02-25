@@ -25,9 +25,9 @@ def std_col_mean(y_vec):
     return jnp.nanstd(jnp.nanmean(Y, axis=0), ddof=1)
 
 
-def reciprocity(y_vec):
+def reciprocity(y_vec, is_adj=False):
     """Correlation between vec(Y) and vec(Y.T)"""
-    Y = vec_to_adjacency(y_vec, include_nan=True)
+    Y = y_vec if is_adj else vec_to_adjacency(y_vec, include_nan=True)
     return nancor(Y.T.ravel(), Y.ravel())
 
 

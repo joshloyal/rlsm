@@ -5,7 +5,7 @@ import numpyro
 import numpyro.distributions as dist
 
 from joblib import Parallel, delayed
-from jax.scipy.special import expit, logsumexp
+from jax.scipy.special import expit, logsumexp, logit
 from scipy.linalg import orthogonal_procrustes
 from numpyro import handlers
 from numpyro.infer import MCMC, NUTS
@@ -13,6 +13,7 @@ from numpyro.infer.util import log_density
 from numpyro.diagnostics import print_summary as numpyro_print_summary
 from numpyro.distributions import constraints
 from sklearn.metrics import roc_auc_score
+from sklearn.linear_model import LogisticRegression
 
 from jax import jit, random, vmap
 from sklearn.utils import check_random_state
@@ -23,6 +24,7 @@ from .network_utils import (
 from .distributions import BivariateBernoulli, to_probs, to_logits
 from .plots import plot_model
 from .mcmc_utils import condition
+from .initialize import initialize_mds
 
 
 def init_to_uniform(low=-2., high=2., shape=()):
@@ -73,9 +75,8 @@ def calculate_posterior_predictive(mcmc, stat_fun, random_state, *model_args,
 
 
 def print_summary(samples, divergences, prob=0.9):
-    #fields = ['recip_coef', 'dist_coef',
-    #          'a_sigma', 'b_sigma', 'ab_sigma', 'u_sigma']
-    fields = ['recip_coef', 'a_sigma', 'b_sigma', 'ab_sigma', 'u_sigma']
+    fields = ['dist_coef', 'recip_coef', 
+            'a_sigma', 'b_sigma', 'ab_sigma', 'u_sigma']
     samples = {k: v for k, v in samples.items() if
         k in fields and k in samples.keys()}
     samples = jax.tree_map(lambda x : jnp.expand_dims(x, axis=0), samples)
@@ -90,7 +91,8 @@ def pairwise_distance(U):
     return dist_sq
 
     
-def rlsm(Y, n_nodes, n_features=2, include_reciprocity=True, is_predictive=False):
+def rlsm(Y, n_nodes, n_features=2, 
+         reciprocity_type='distance', is_predictive=False):
     
     # cholesky decomposition of sender/receiver covariance
     omega_ab = numpyro.sample("omega_ab",
@@ -116,62 +118,55 @@ def rlsm(Y, n_nodes, n_features=2, include_reciprocity=True, is_predictive=False
     b = numpyro.deterministic("b", ab[1]).reshape(-1, 1)
 
     # latent positions
-    u_sigma = numpyro.sample('u_sigma',dist.Gamma(1., 0.5))
+    u_sigma = numpyro.sample('u_sigma', dist.Gamma(1., 0.5))
     if n_features is not None and n_features > 0 :
         Z = numpyro.sample('Z',
             dist.Normal(jnp.zeros((n_nodes, n_features)),
                         jnp.ones((n_nodes, n_features))))
         U = numpyro.deterministic('U', u_sigma * Z)
-
  
     # reciprocity
-    if include_reciprocity:
+    if reciprocity_type in ['distance', 'common']:
         recip_coef = numpyro.sample("recip_coef", dist.Normal(0., 10.))  
-        dist_coef = 1.
-    else:
-        recip_coef = numpyro.deterministic("recip_coef", 0.)
-        dist_coef = 0.
-    
-    # coefficient in front of distance in reciprocity term
-    #dist_coef = numpyro.sample("dist_coef", dist.Normal(0., 10.))
-    
-    # nodewise reciprocity
-    #gamma_sigma = numpyro.sample("gamma_sigma", dist.Gamma(1., 0.5))
-    #z = numpyro.sample("z_gamma", dist.Normal(
-    #    jnp.zeros(n_nodes), jnp.ones(n_nodes)))
-    #gamma = numpyro.deterministic("gamma", gamma_sigma * z)
-    #gamma = gamma.reshape(-1, 1)
+        dist_coef = numpyro.sample('dist_coef', dist.Normal(0., 10.))
 
-    triu = jnp.triu_indices(n_nodes, k=1)
-    distances = jnp.sqrt(pairwise_distance(U)[triu])
-    #node_rep = (gamma + gamma.T)[triu]
-    ab = adjacency_to_dyads(a + b.T, n_nodes)
+    distances_sq = pairwise_distance(U)
+    ab = a + b.T
 
     # likelihood
     with numpyro.handlers.condition(data={"Y": Y}):
-        #logits = to_logits(edge_coef, recip_coef, dist_coef, ab, distances)
-        logits = to_logits(recip_coef, dist_coef, ab, distances)
-        y = numpyro.sample("Y", BivariateBernoulli(logits=logits))
+        triu = jnp.triu_indices(n_nodes, k=1)
+        distances = jnp.sqrt(distances_sq[triu])
+        ab = adjacency_to_dyads(a + b.T, n_nodes)
+        if reciprocity_type in ['distance', 'common']:
+            #logits = to_logits(recip_coef, ab, distances, reciprocity_type)
+            logits = to_logits(recip_coef, ab, distances, dist_coef, reciprocity_type)
+            y = numpyro.sample("Y", BivariateBernoulli(logits=logits))
 
-        if is_predictive:
-            probas = numpyro.deterministic('probas', 
-                    #to_probs(edge_coef, recip_coef, dist_coef, ab, distances))
-                    to_probs(recip_coef, dist_coef, ab, distances))
+            if is_predictive:
+                probas = numpyro.deterministic('probas', 
+                        to_probs(recip_coef, ab, distances, dist_coef, reciprocity_type))
+        else:
+            nondiag = nondiag_indices(n_nodes)
+            eta = (a + b.T)[nondiag] - jnp.sqrt(distances_sq[nondiag])
+            y = numpyro.sample("Y", dist.Bernoulli(logits=eta))
+            if is_predictive:
+                numpyro.deterministic("probas", expit(eta))
 
 
 class ReciprocityLSM(object):
     def __init__(self,
                  n_features=None,
-                 include_reciprocity=True,
+                 reciprocity_type='distance',
                  random_state=42):
         self.n_features = n_features
-        self.include_reciprocity = include_reciprocity
+        self.reciprocity_type = reciprocity_type
         self.random_state = random_state
 
     @property
     def model_args_(self):
         n_nodes = self.samples_['U'].shape[1]
-        return (None, n_nodes, self.n_features, self.include_reciprocity)
+        return (None, n_nodes, self.n_features, self.reciprocity_type)
 
     @property
     def model_kwargs_(self):
@@ -179,19 +174,52 @@ class ReciprocityLSM(object):
 
     def sample(self, Y, 
             n_warmup=1000, n_samples=1000, adapt_delta=0.8, n_iter=10000):
-        #numpyro.enable_x64()
 
         n_nodes = Y.shape[0]
         self.Y_fit_ = Y.copy()
-        y = adjacency_to_dyads_multinomial(Y, n_nodes)
+
+        if self.reciprocity_type in ['distance', 'common']:
+            y = adjacency_to_dyads_multinomial(Y, n_nodes)
+        else:
+            y = adjacency_to_vec(Y)
+        
+        # parameter initialization 
+
+        # MDS estimates for latent positions
+        X_init = initialize_mds(
+            Y, n_features=self.n_features, random_state=self.random_state)
+        
+        # bayes proportion (alpha = 1, beta = 1)
+        a_init = logit((Y.sum(axis=1) + 1) / (n_nodes + 2))
+        b_init = logit((Y.sum(axis=0) + 1) / (n_nodes + 2))
+        ab_init = np.hstack((a_init.reshape(-1, 1), b_init.reshape(-1, 1)))
+        edge_init = np.mean(ab_init)
+        ab_init -= edge_init
+        
+        # logreg estimate of odds ratio
+        dist = np.sqrt(
+            adjacency_to_dyads(pairwise_distance(X_init), n=Y.shape[0])[:, 0])
+        dyads = adjacency_to_dyads(Y, n=Y.shape[0])
+        features = np.hstack((dyads[:, 0].reshape(-1, 1),
+            (dyads[:, 0] * dist).reshape(-1, 1)))
+
+        #recip_init = LogisticRegression(penalty='none').fit(
+        #        dyads[:, 0].reshape(-1, 1), dyads[:, 1]).coef_.flatten() 
+        coefs = LogisticRegression(penalty='none').fit(
+                features, dyads[:, 1]).coef_.ravel()
+        recip_init, dist_init = coefs[0], coefs[1]
 
         # run mcmc sampler
         rng_key = random.PRNGKey(self.random_state)
-        model_args = (y, n_nodes, self.n_features, self.include_reciprocity, False)
-
-        mcmc = MCMC(NUTS(rlsm), num_warmup=n_warmup, num_samples=n_samples,
-                    num_chains=1)
-        mcmc.run(rng_key, *model_args)
+        model_args = (
+                y, n_nodes, self.n_features, self.reciprocity_type, False)
+         
+        mcmc = MCMC(NUTS(rlsm), num_warmup=n_warmup, num_samples=n_samples, 
+                num_chains=1)
+        mcmc.run(rng_key, *model_args, 
+                init_params={"Z": X_init, 'z_ab': ab_init, 
+                    'edge_coef': edge_init, 'recip_coef': recip_init,
+                    'dist_init': dist_init})
         self.diverging_ = jnp.sum(mcmc.get_extra_fields()['diverging'])
 
         # extract/process samples
@@ -200,7 +228,8 @@ class ReciprocityLSM(object):
         # calculate log density
         self.logp_ = vmap(
             lambda sample : log_density(
-                rlsm, model_args=(y, n_nodes, self.n_features), 
+                rlsm, model_args=(
+                    y, n_nodes, self.n_features, self.reciprocity_type), 
                 model_kwargs={'is_predictive': False},
                 params=sample)[0])(self.samples_)
         self.map_idx_ = np.argmax(self.logp_)
@@ -213,10 +242,10 @@ class ReciprocityLSM(object):
         
         self.a_ = self.samples_['a'].mean(axis=0)
         self.b_ = self.samples_['b'].mean(axis=0)
-        #self.edge_coef_ = self.samples_['edge_coef'].mean()
-        self.recip_coef_ = self.samples_['recip_coef'].mean()
-        #self.dist_coef_ = self.samples_['dist_coef'].mean()
         self.U_ = self.samples_['U'].mean(axis=0)
+
+        if self.reciprocity_type in ['distance', 'common']:
+            self.recip_coef_ = self.samples_['recip_coef'].mean()
 
         self.probas_ = self.predict_proba()
         self.auc_ = roc_auc_score(adjacency_to_vec(self.Y_fit_), self.probas_)
@@ -258,8 +287,12 @@ class ReciprocityLSM(object):
         n_nodes = self.samples_['U'].shape[1]
         vmap_args = (self.samples_, random.split(rng_key, n_samples))
         
-        y = adjacency_to_dyads_multinomial(self.Y_fit_, n_nodes)
-        model_args = (y, n_nodes, self.n_features, self.include_reciprocity)
+        if self.reciprocity_type in ['distance', 'common']:
+            y = adjacency_to_dyads_multinomial(self.Y_fit_, n_nodes)
+        else:
+            y = adjacency_to_vec(self.Y_fit_)
+
+        model_args = (y, n_nodes, self.n_features, self.reciprocity_type)
         
         loglik = vmap(
             lambda samples, rng_key : log_likelihood(

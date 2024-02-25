@@ -11,7 +11,7 @@ from .gof import (
 from .network_utils import adjacency_to_vec
 
 
-def plot_model(ame, Y_obs, **fig_kwargs):
+def plot_model(rlsm, Y_obs, **fig_kwargs):
     ax_dict = plt.figure(
         constrained_layout=True, **fig_kwargs).subplot_mosaic(
         """
@@ -24,15 +24,15 @@ def plot_model(ame, Y_obs, **fig_kwargs):
     ax = list(ax_dict.values())
     
 
-    ax[0].plot(np.asarray(ame.logp_), alpha=0.8)
+    ax[0].plot(np.asarray(rlsm.logp_), alpha=0.8)
     ax[0].axhline(
-        np.asarray(ame.logp_).mean(), color='k', linestyle='--')
+        np.asarray(rlsm.logp_).mean(), color='k', linestyle='--')
     ax[0].set_ylabel('Log-Posterior')
     
     for param in ['a_sigma', 'b_sigma', 'ab_sigma', 'u_sigma']:
-        n_samples = ame.samples_[param].shape[0]
-        ax[1].plot(np.asarray(ame.samples_[param]), alpha=0.8)
-        param_mean = np.asarray(ame.samples_[param]).mean()
+        n_samples = rlsm.samples_[param].shape[0]
+        ax[1].plot(np.asarray(rlsm.samples_[param]), alpha=0.8)
+        param_mean = np.asarray(rlsm.samples_[param]).mean()
         ax[1].axhline(param_mean, color='k', linestyle='--')
         label = param.split('_')[0]
         ax[1].text(x=n_samples, y=param_mean,
@@ -40,12 +40,18 @@ def plot_model(ame, Y_obs, **fig_kwargs):
 
     ax[1].set_ylabel('Marginal Variances')
     
-    ax[2].plot(np.asarray(ame.samples_['recip_coef']), alpha=0.8)
+    ax[2].plot(np.asarray(rlsm.samples_['edge_coef']), alpha=0.8)
     ax[2].axhline(
-        np.asarray(ame.samples_['recip_coef']).mean(), color='k', linestyle='--')
-    ax[2].plot(np.asarray(ame.samples_['dist_coef']), alpha=0.8)
-    ax[2].axhline(
-        np.asarray(ame.samples_['dist_coef']).mean(), color='k', linestyle='--') 
+        np.asarray(rlsm.samples_['edge_coef']).mean(), color='k', linestyle='--')
+    if rlsm.reciprocity_type in ['distance', 'common']:
+        ax[2].plot(np.asarray(rlsm.samples_['recip_coef']), alpha=0.8)
+        ax[2].axhline(
+            np.asarray(rlsm.samples_['recip_coef']).mean(), color='k', linestyle='--')
+    if rlsm.reciprocity_type == 'distance':
+        ax[2].plot(np.asarray(rlsm.samples_['dist_coef']), alpha=0.8)
+        ax[2].axhline(
+            np.asarray(rlsm.samples_['dist_coef']).mean(), color='k', linestyle='--')
+
     ax[2].set_ylabel('Coefficients')
     
     y_vec = adjacency_to_vec(Y_obs)
@@ -58,7 +64,7 @@ def plot_model(ame, Y_obs, **fig_kwargs):
     }
     start = 3
     for k, (key, stat_func) in enumerate(stats.items()):
-        res = ame.posterior_predictive(stat_func)
+        res = rlsm.posterior_predictive(stat_func)
         ax[k+start].hist(res, edgecolor='k', color='#add8e6')
         ax[k+start].axvline(
             stat_func(y_vec), color='k', linestyle='--', linewidth=3)
