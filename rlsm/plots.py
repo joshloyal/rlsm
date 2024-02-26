@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import arviz as az
 
 from .gof import (
     std_row_mean,
@@ -12,14 +13,24 @@ from .network_utils import adjacency_to_vec
 
 
 def plot_model(rlsm, Y_obs, **fig_kwargs):
-    ax_dict = plt.figure(
-        constrained_layout=True, **fig_kwargs).subplot_mosaic(
-        """
-        AABC
-        DDEE
-        FFGH
-        """
-    )
+    if rlsm.reciprocity_type == 'none':
+        ax_dict = plt.figure(
+            constrained_layout=True, **fig_kwargs).subplot_mosaic(
+            """
+            AABC
+            DDEE
+            FFGH
+            """
+        )
+    else:
+        ax_dict = plt.figure(
+            constrained_layout=True, **fig_kwargs).subplot_mosaic(
+            """
+            AABC
+            DDEE
+            FGHI
+            """
+        )
     
     ax = list(ax_dict.values())
     
@@ -54,15 +65,34 @@ def plot_model(rlsm, Y_obs, **fig_kwargs):
 
     ax[2].set_ylabel('Coefficients')
     
+    if rlsm.reciprocity_type in ['distance', 'common']:
+        phi = rlsm.samples_['dist_coef']
+        rho = rlsm.samples_['recip_coef']
+        az.plot_kde(phi, rho, hdi_probs=[0.25, 0.75, 0.95],
+                contourf_kwargs={"cmap": "Blues"}, ax=ax[3])
+        ax[3].scatter(phi.mean(), rho.mean(), color='k', marker='x')
+        ax[3].set_xlabel(r"Distance-Dependent Reciprocity ($\phi$)")
+        ax[3].set_ylabel(r"Baseline Reciprocity ($\rho$)")
+
     y_vec = adjacency_to_vec(Y_obs)
-    stats = {
-        'sd.rowmean': std_row_mean,
-        'sd.colmean': std_col_mean,
-        'reciprocity': reciprocity,
-        'cycles': cycle_dependence,
-        'transitivity': trans_dependence
-    }
-    start = 3
+    if rlsm.reciprocity_type == 'none':
+        stats = {
+            'sd.rowmean': std_row_mean,
+            'sd.colmean': std_col_mean,
+            'reciprocity': reciprocity,
+            'cycles': cycle_dependence,
+            'transitivity': trans_dependence
+        }
+        start = 3  
+    else:
+        stats = {
+            'reciprocity': reciprocity,
+            'sd.rowmean': std_row_mean,
+            'sd.colmean': std_col_mean,
+            'cycles': cycle_dependence,
+            'transitivity': trans_dependence
+        }
+        start = 4 
     for k, (key, stat_func) in enumerate(stats.items()):
         res = rlsm.posterior_predictive(stat_func)
         ax[k+start].hist(res, edgecolor='k', color='#add8e6')

@@ -27,18 +27,6 @@ from .mcmc_utils import condition
 from .initialize import initialize_mds
 
 
-def init_to_uniform(low=-2., high=2., shape=()):
-    def init_fn(rng_key):
-        return random.uniform(rng_key, shape=shape, minval=low, maxval=high)
-    return init_fn
-
-
-def init_to_normal(shape=()):
-    def init_fn(rng_key):
-        return random.normal(rng_key, shape=shape)
-    return init_fn
-
-
 def posterior_predictive(model, rng_key, samples, stat_fun, *model_args,
                          **model_kwargs):
     model = handlers.seed(condition(model, samples), rng_key)
@@ -90,6 +78,36 @@ def pairwise_distance(U):
     dist_sq = U_norm_sq + U_norm_sq.T - 2 * U @ U.T
     return dist_sq
 
+
+def initialize_parameters(Y, n_features=2, random_state=None):
+    n_nodes = Y.shape[0]
+
+    # MDS estimates for latent positions
+    X_init = initialize_mds(
+        Y, n_features=n_features, random_state=random_state)
+    
+    # bayes proportion (alpha = 1, beta = 1)
+    a_init = logit((Y.sum(axis=1) + 1) / (n_nodes + 2))
+    b_init = logit((Y.sum(axis=0) + 1) / (n_nodes + 2))
+    ab_init = np.hstack((a_init.reshape(-1, 1), b_init.reshape(-1, 1)))
+    edge_init = np.mean(ab_init)
+    ab_init -= edge_init
+    
+    # logreg estimate of odds ratio
+    dist = np.sqrt(
+        adjacency_to_dyads(pairwise_distance(X_init), n=Y.shape[0])[:, 0])
+    dyads = adjacency_to_dyads(Y, n=Y.shape[0])
+    features = np.hstack((dyads[:, 0].reshape(-1, 1),
+        (dyads[:, 0] * dist).reshape(-1, 1)))
+
+    coefs = LogisticRegression(penalty='none').fit(
+            features, dyads[:, 1]).coef_.ravel()
+    recip_init, dist_init = coefs[0], coefs[1]
+    
+    return {"Z": X_init, 'z_ab': ab_init, 
+            'edge_coef': edge_init, 'recip_coef': recip_init,
+            'dist_init': dist_init}
+
     
 def rlsm(Y, n_nodes, n_features=2, 
          reciprocity_type='distance', is_predictive=False):
@@ -139,7 +157,6 @@ def rlsm(Y, n_nodes, n_features=2,
         distances = jnp.sqrt(distances_sq[triu])
         ab = adjacency_to_dyads(a + b.T, n_nodes)
         if reciprocity_type in ['distance', 'common']:
-            #logits = to_logits(recip_coef, ab, distances, reciprocity_type)
             logits = to_logits(recip_coef, ab, distances, dist_coef, reciprocity_type)
             y = numpyro.sample("Y", BivariateBernoulli(logits=logits))
 
@@ -172,8 +189,7 @@ class ReciprocityLSM(object):
     def model_kwargs_(self):
         return {'is_predictive': True}
 
-    def sample(self, Y, 
-            n_warmup=1000, n_samples=1000, adapt_delta=0.8, n_iter=10000):
+    def sample(self, Y, n_warmup=1000, n_samples=1000, adapt_delta=0.8):
 
         n_nodes = Y.shape[0]
         self.Y_fit_ = Y.copy()
@@ -184,42 +200,17 @@ class ReciprocityLSM(object):
             y = adjacency_to_vec(Y)
         
         # parameter initialization 
-
-        # MDS estimates for latent positions
-        X_init = initialize_mds(
-            Y, n_features=self.n_features, random_state=self.random_state)
-        
-        # bayes proportion (alpha = 1, beta = 1)
-        a_init = logit((Y.sum(axis=1) + 1) / (n_nodes + 2))
-        b_init = logit((Y.sum(axis=0) + 1) / (n_nodes + 2))
-        ab_init = np.hstack((a_init.reshape(-1, 1), b_init.reshape(-1, 1)))
-        edge_init = np.mean(ab_init)
-        ab_init -= edge_init
-        
-        # logreg estimate of odds ratio
-        dist = np.sqrt(
-            adjacency_to_dyads(pairwise_distance(X_init), n=Y.shape[0])[:, 0])
-        dyads = adjacency_to_dyads(Y, n=Y.shape[0])
-        features = np.hstack((dyads[:, 0].reshape(-1, 1),
-            (dyads[:, 0] * dist).reshape(-1, 1)))
-
-        #recip_init = LogisticRegression(penalty='none').fit(
-        #        dyads[:, 0].reshape(-1, 1), dyads[:, 1]).coef_.flatten() 
-        coefs = LogisticRegression(penalty='none').fit(
-                features, dyads[:, 1]).coef_.ravel()
-        recip_init, dist_init = coefs[0], coefs[1]
+        init_params = initialize_parameters(
+                Y, n_features=self.n_features, random_state=self.random_state)
 
         # run mcmc sampler
         rng_key = random.PRNGKey(self.random_state)
         model_args = (
                 y, n_nodes, self.n_features, self.reciprocity_type, False)
          
-        mcmc = MCMC(NUTS(rlsm), num_warmup=n_warmup, num_samples=n_samples, 
-                num_chains=1)
-        mcmc.run(rng_key, *model_args, 
-                init_params={"Z": X_init, 'z_ab': ab_init, 
-                    'edge_coef': edge_init, 'recip_coef': recip_init,
-                    'dist_init': dist_init})
+        mcmc = MCMC(NUTS(rlsm, target_accept_prob=adapt_delta), 
+                num_warmup=n_warmup, num_samples=n_samples, num_chains=1)
+        mcmc.run(rng_key, *model_args, init_params=init_params)
         self.diverging_ = jnp.sum(mcmc.get_extra_fields()['diverging'])
 
         # extract/process samples
@@ -275,6 +266,7 @@ class ReciprocityLSM(object):
         )(*vmap_args).mean(axis=0))
 
     def print_summary(self, proba=0.9):
+        print(f"AUC: {self.auc_:.3f}, WAIC: {self.waic():.3f}")
         print_summary(self.samples_, self.diverging_, prob=proba)
 
     def plot(self, Y_obs=None, **fig_kwargs):
