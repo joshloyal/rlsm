@@ -15,12 +15,15 @@ def adjacency_to_dyads(Y, n):
     return jnp.hstack((Y.T[triu].reshape(-1, 1), Y[triu].reshape(-1, 1)))
 
 
-def adjacency_to_dyads_multinomial(Y, n):
-    y = adjacency_to_dyads(Y, n)
+def dyads_to_multinomial(y):
     return jnp.c_[y[:, 0] * y[:, 1],
            y[:, 0] * (1 - y[:, 1]),
            (1 - y[:, 0]) * y[:, 1],
            (1 - y[:, 0]) * (1 - y[:, 1])]
+
+def adjacency_to_dyads_multinomial(Y, n):
+    y = adjacency_to_dyads(Y, n)
+    return dyads_to_multinomial(y)
 
 
 def adjacency_to_vec(Y):

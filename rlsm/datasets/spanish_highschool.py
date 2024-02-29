@@ -18,4 +18,14 @@ def load_spanish_highschool():
 
     features = pd.read_csv(join(dir_path, 'nodes.csv'))
     features = features[['course', 'cluster', 'sex']]  
+    
+    # friend or not
+    Y = (Y > 0).astype(float)
+    
+    # remove isolated nodes
+    d_out = Y.sum(axis=1)
+    d_in = Y.sum(axis=0)
+    ids = np.logical_or(d_out > 0, d_in > 0)
+    Y = Y[ids][:, ids]
+
     return Y, features
