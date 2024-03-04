@@ -40,7 +40,7 @@ def plot_model(rlsm, Y_obs, **fig_kwargs):
         np.asarray(rlsm.logp_).mean(), color='k', linestyle='--')
     ax[0].set_ylabel('Log-Posterior')
     
-    for param in ['s_sigma', 'r_sigma', 'sr_corr', 'z_sigma']:
+    for param in ['s_var', 'r_var', 'sr_corr', 'z_sigma']:
         n_samples = rlsm.samples_[param].shape[0]
         ax[1].plot(np.asarray(rlsm.samples_[param]), alpha=0.8)
         param_mean = np.asarray(rlsm.samples_[param]).mean()

@@ -4,6 +4,7 @@ import jax.numpy as jnp
 import numpyro
 import numpyro.distributions as dist
 
+from collections import OrderedDict
 from joblib import Parallel, delayed
 from jax.scipy.special import expit, logsumexp, logit
 from scipy.linalg import orthogonal_procrustes
@@ -63,11 +64,12 @@ def calculate_posterior_predictive(mcmc, stat_fun, random_state, *model_args,
 
 
 def print_summary(samples, divergences, prob=0.9):
-    fields = ['dist_coef', 'recip_coef', 
-            's_sigma', 'r_sigma', 'sr_corr', 's_sigma']
+    fields = ['recip_coef', 'dist_coef', 's_var', 'r_var', 'sr_corr']
     samples = {k: v for k, v in samples.items() if
         k in fields and k in samples.keys()}
     samples = jax.tree_map(lambda x : jnp.expand_dims(x, axis=0), samples)
+    samples = OrderedDict({k: samples[k] for k in fields})
+
     numpyro_print_summary(samples, prob=prob)
     if divergences is not None:
         print(f"Number of divergences: {divergences}")
@@ -128,9 +130,9 @@ def rlsm(Y, n_nodes, n_features=2,
     # centered sender/receiver parameters
     L_sr = jnp.diag(jnp.sqrt(sigma_sr)) @ rho_sr
     Sigma_sr = L_sr @ L_sr.T
-    numpyro.deterministic('s_sigma', Sigma_sr[0, 0])
-    numpyro.deterministic('r_sigma', Sigma_sr[1, 1])
-    numpyro.deterministic('sr_sigma', Sigma_sr[0, 1])
+    numpyro.deterministic('s_var', Sigma_sr[0, 0])
+    numpyro.deterministic('r_var', Sigma_sr[1, 1])
+    numpyro.deterministic('sr_cov', Sigma_sr[0, 1])
     numpyro.deterministic('sr_corr', rho_sr[1, 0])
     z_sr = numpyro.sample("z_sr",
         dist.Normal(jnp.zeros((2, n_nodes)), jnp.ones((2, n_nodes))))
