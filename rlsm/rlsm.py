@@ -108,7 +108,7 @@ def initialize_parameters(Y, n_features=2, random_state=None):
     
     return {"U": X_init, 'z_sr': sr_init, 
             'mu_sr': edge_init, 'recip_coef': recip_init,
-            'dist_init': dist_init}
+            'dist_coef': dist_init}
 
     
 def rlsm(Y, n_nodes, n_features=2, 
@@ -184,7 +184,7 @@ def rlsm(Y, n_nodes, n_features=2,
 
 class ReciprocityLSM(object):
     def __init__(self,
-                 n_features=None,
+                 n_features=2,
                  reciprocity_type='distance',
                  random_state=42):
         self.n_features = n_features
@@ -243,7 +243,10 @@ class ReciprocityLSM(object):
             self.samples_['Z'][idx] = self.samples_['Z'][idx] @ R
         
         self.s_ = self.samples_['s'].mean(axis=0)
+        self.s_var_ = self.samples_['s_var'].mean(axis=0)
         self.r_ = self.samples_['r'].mean(axis=0)
+        self.r_var_ = self.samples_['r_var'].mean(axis=0)
+        self.sr_corr_ = self.samples_['sr_corr'].mean(axis=0)
         self.Z_ = self.samples_['Z'].mean(axis=0)
 
         if self.reciprocity_type in ['distance', 'common']:
