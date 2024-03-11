@@ -64,7 +64,7 @@ def calculate_posterior_predictive(mcmc, stat_fun, random_state, *model_args,
 
 
 def print_summary(samples, divergences, prob=0.9):
-    fields = ['recip_coef', 'dist_coef', 's_var', 'r_var', 'sr_corr']
+    fields = ['recip_coef', 'dist_coef', 's_var', 'r_var', 'sr_corr', 'z_var']
     samples = {k: v for k, v in samples.items() if
         k in fields and k in samples.keys()}
     samples = jax.tree_map(lambda x : jnp.expand_dims(x, axis=0), samples)
@@ -106,17 +106,21 @@ def initialize_parameters(Y, n_features=2, random_state=None):
             features, dyads[:, 1]).coef_.ravel()
     recip_init, dist_init = coefs[0], coefs[1]
     
-    return {"U": X_init, 'z_sr': sr_init, 
+    return {"U": X_init, 'z_sr': sr_init.T, 
             'mu_sr': edge_init, 'recip_coef': recip_init,
-            'dist_coef': dist_init}
+            'dist_coef': dist_init, 'sigma_sr': np.var(sr_init, axis=0),
+            'rho_sr': np.corrcoef(s_init, r_init)[1, 0],
+            'z_var': np.var(X_init)}
+
 
     
 def rlsm(Y, n_nodes, n_features=2, 
          reciprocity_type='distance', is_predictive=False):
     
     # cholesky decomposition of sender/receiver covariance
-    rho_sr = numpyro.sample("rho_sr",
-        dist.LKJCholesky(2, concentration=1.)) # rho ~ unif(-1, 1)
+    #rho_sr = numpyro.sample("rho_sr",
+    #    dist.LKJCholesky(2, concentration=1.)) # rho ~ unif(-1, 1)
+    rho_sr = numpyro.sample("rho_sr", dist.Uniform(-1., 1.))
     sigma_sr = numpyro.sample("sigma_sr",
         dist.InverseGamma(1.5 * jnp.ones(2), 1.5 * jnp.ones(2)))
     #sigma_sr = numpyro.sample("sigma_sr",
@@ -128,12 +132,13 @@ def rlsm(Y, n_nodes, n_features=2,
     #        dist.HalfCauchy(scale=2 * jnp.ones(2)))
 
     # centered sender/receiver parameters
-    L_sr = jnp.diag(jnp.sqrt(sigma_sr)) @ rho_sr
+    L_sr = jnp.eye(2).at[1,0].set(rho_sr)
+    L_sr = jnp.diag(jnp.sqrt(sigma_sr)) @ L_sr
     Sigma_sr = L_sr @ L_sr.T
     numpyro.deterministic('s_var', Sigma_sr[0, 0])
     numpyro.deterministic('r_var', Sigma_sr[1, 1])
     numpyro.deterministic('sr_cov', Sigma_sr[0, 1])
-    numpyro.deterministic('sr_corr', rho_sr[1, 0])
+    numpyro.deterministic('sr_corr', rho_sr)
     z_sr = numpyro.sample("z_sr",
         dist.Normal(jnp.zeros((2, n_nodes)), jnp.ones((2, n_nodes))))
     
@@ -147,7 +152,7 @@ def rlsm(Y, n_nodes, n_features=2,
 
     # latent positions
     #u_sigma = numpyro.sample('u_sigma', dist.Gamma(1., 0.5))
-    z_sigma = numpyro.sample('z_sigma', dist.InverseGamma(1.5, 1.5)) # 1 * invX2(1)
+    z_sigma = numpyro.sample('z_var', dist.InverseGamma(1.5, 1.5)) # 1 * invX2(1)
     if n_features is not None and n_features > 0 :
         U = numpyro.sample('U',
             dist.Normal(jnp.zeros((n_nodes, n_features)),

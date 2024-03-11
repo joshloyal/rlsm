@@ -32,6 +32,5 @@ def initialize_mds(Y, n_features=2, random_state=None):
     
     # standardize
     X -= X.mean(axis=0)
-    X /= X.std(axis=0)
 
     return X

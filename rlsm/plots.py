@@ -17,18 +17,18 @@ def plot_model(rlsm, Y_obs, **fig_kwargs):
         ax_dict = plt.figure(
             constrained_layout=True, **fig_kwargs).subplot_mosaic(
             """
-            AABC
-            DDEE
-            FFGH
+            AAABC
+            DDDEE
+            FGHIJ
             """
         )
     else:
         ax_dict = plt.figure(
             constrained_layout=True, **fig_kwargs).subplot_mosaic(
             """
-            AABC
-            DDEE
-            FGHI
+            AAABC
+            DDDEE
+            FGHIJ
             """
         )
     
@@ -40,7 +40,7 @@ def plot_model(rlsm, Y_obs, **fig_kwargs):
         np.asarray(rlsm.logp_).mean(), color='k', linestyle='--')
     ax[0].set_ylabel('Log-Posterior')
     
-    for param in ['s_var', 'r_var', 'sr_corr', 'z_sigma']:
+    for param in ['s_var', 'r_var', 'sr_corr', 'z_var']:
         n_samples = rlsm.samples_[param].shape[0]
         ax[1].plot(np.asarray(rlsm.samples_[param]), alpha=0.8)
         param_mean = np.asarray(rlsm.samples_[param]).mean()
@@ -73,6 +73,18 @@ def plot_model(rlsm, Y_obs, **fig_kwargs):
         ax[3].scatter(phi.mean(), rho.mean(), color='k', marker='x')
         ax[3].set_xlabel(r"Distance-Dependent Reciprocity ($\phi$)")
         ax[3].set_ylabel(r"Baseline Reciprocity ($\rho$)")
+    
+    s_var = rlsm.samples_['s_var']
+    r_var = rlsm.samples_['r_var']
+    z_var = rlsm.samples_['z_var']
+    az.plot_kde(s_var, label=r'$\sigma_s^2$', ax=ax[4], 
+            plot_kwargs={'color': 'steelblue'})
+    az.plot_kde(r_var, label=r'$\sigma_r^2$', ax=ax[4],
+            plot_kwargs={'color': 'darkorange'})
+    az.plot_kde(z_var, label=r'$\sigma_z^2$', ax=ax[4],
+            plot_kwargs={'color': 'tomato'})
+    ax[4].set_ylabel('Marginal Posterior Density')
+    ax[4].set_xlabel('Variance')
 
     y_vec = adjacency_to_vec(Y_obs)
     if rlsm.reciprocity_type == 'none':
@@ -83,7 +95,7 @@ def plot_model(rlsm, Y_obs, **fig_kwargs):
             'cycles': cycle_dependence,
             'transitivity': trans_dependence
         }
-        start = 3  
+        start = 4  
     else:
         stats = {
             'reciprocity': reciprocity,
@@ -92,7 +104,7 @@ def plot_model(rlsm, Y_obs, **fig_kwargs):
             'cycles': cycle_dependence,
             'transitivity': trans_dependence
         }
-        start = 4 
+        start = 5 
     for k, (key, stat_func) in enumerate(stats.items()):
         res = rlsm.posterior_predictive(stat_func)
         ax[k+start].hist(res, edgecolor='k', color='#add8e6')
