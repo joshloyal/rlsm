@@ -62,6 +62,10 @@ def plot_model(rlsm, Y_obs, **fig_kwargs):
         ax[2].plot(np.asarray(rlsm.samples_['dist_coef']), alpha=0.8)
         ax[2].axhline(
             np.asarray(rlsm.samples_['dist_coef']).mean(), color='k', linestyle='--')
+    if rlsm.X_dyad_fit_ is not None:
+        ax[2].plot(np.asarray(rlsm.samples_['beta_dyad']), alpha=0.8)
+        for k in range(rlsm.beta_dyad_.shape[0]):
+            ax[2].axhline(rlsm.beta_dyad_[k], color='k', linestyle='--')
 
     ax[2].set_ylabel('Coefficients')
     

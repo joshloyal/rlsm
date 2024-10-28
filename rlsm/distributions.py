@@ -9,20 +9,20 @@ from jax.nn import softmax
 from .network_utils import dyads_to_vec
 
 
-def to_probs(recip_coef, ab, dist, dist_coef, reciprocity_type='distance'):
-    probas = softmax(to_logits(recip_coef, ab, dist, dist_coef, reciprocity_type), axis=-1)
+def to_probs(recip_coef, sr, dist, dist_coef, reciprocity_type='distance'):
+    probas = softmax(to_logits(recip_coef, sr, dist, dist_coef, reciprocity_type), axis=-1)
     return dyads_to_vec(
             jnp.c_[probas[:, 0] + probas[:, 1], probas[:, 0] + probas[:, 2]])  
 
 
-def to_logits(recip_coef, ab, dist, dist_coef, reciprocity_type='distance'):
+def to_logits(recip_coef, sr, dist, dist_coef, reciprocity_type='distance'):
     if reciprocity_type == 'distance':
-        mu11 = ab[:, 0] + ab[:, 1] + recip_coef + (dist_coef - 2) *  dist
+        mu11 = sr[:, 0] + sr[:, 1] + recip_coef + (dist_coef - 2) *  dist
     else:
-        mu11 = ab[:, 0] + ab[:, 1] + recip_coef - 2 * dist
+        mu11 = sr[:, 0] + sr[:, 1] + recip_coef - 2 * dist
 
-    mu10 = ab[:, 0] - dist
-    mu01 = ab[:, 1] - dist
+    mu10 = sr[:, 0] - dist
+    mu01 = sr[:, 1] - dist
     mu00 = jnp.zeros_like(mu01)
     return jnp.c_[mu11, mu10, mu01, mu00]
     

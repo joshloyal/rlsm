@@ -10,7 +10,8 @@ def load_lawyers(relation_type='advise'):
     dir_path = join(module_path, 'data', 'lazegas_lawyers')
 
     if relation_type == 'advise':
-        Y = np.loadtxt(join(dir_path, 'adj_2.npy'))
+        #Y = np.loadtxt(join(dir_path, 'adj_2.npy'))
+        Y = np.loadtxt(join(dir_path, 'Eladv.dat'))
     else:
         Y = np.loadtxt(join(dir_path, 'adj_3.npy'))
 
