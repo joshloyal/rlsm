@@ -22,8 +22,15 @@ def find_intercept(recip_coef, ab, distances, dist_coef, target_density):
     return root_scalar(density_func, bracket=[-10, 10]).root
 
 
-def generate_data(n_nodes=100, n_features=2, density=0.25, 
-                  recip_coef=None, mu=1, dist_coef=None, random_state=42):
+def find_odds_ratio(dist_coef, distances, target):
+    def target_func(rho):
+        return np.exp(rho + dist_coef * distances).mean() - target
+
+    return root_scalar(target_func, bracket=[-10, 10]).root
+
+
+def generate_data(n_nodes=100, n_features=2, density=0.25, odds_ratio=2.,
+                  mu=1, dist_coef=None, random_state=42):
     rng = check_random_state(random_state)
     key = PRNGKey(random_state)
 
@@ -43,8 +50,10 @@ def generate_data(n_nodes=100, n_features=2, density=0.25,
     distances = np.sqrt(pairwise_distance(Z)[triu])
     sr = adjacency_to_dyads(s + r.T, n_nodes)
     
-    recip_coef = rng.uniform(-1, 1) if recip_coef is None else recip_coef
+    #recip_coef = rng.uniform(-1, 1) if recip_coef is None else recip_coef
     dist_coef = rng.uniform(-1, 1) if dist_coef is None else dist_coef
+
+    recip_coef = rng.uniform(-1, 1) if odds_ratio is None else find_odds_ratio(dist_coef, distances, odds_ratio) 
     edge_coef = find_intercept(recip_coef, sr, distances, dist_coef, density)
 
     logits = to_logits(recip_coef, edge_coef + sr, distances, dist_coef)
