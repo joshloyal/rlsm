@@ -30,7 +30,8 @@ def find_odds_ratio(dist_coef, distances, target):
 
 
 def generate_data(n_nodes=100, n_features=2, density=0.25, odds_ratio=2.,
-                  mu=1, dist_coef=None, random_state=42):
+                  mu=1, include_covariates=False, 
+                  dist_coef=None, random_state=42):
     rng = check_random_state(random_state)
     key = PRNGKey(random_state)
 
@@ -48,7 +49,17 @@ def generate_data(n_nodes=100, n_features=2, density=0.25, odds_ratio=2.,
     
     triu = np.triu_indices(n_nodes, k=1)
     distances = np.sqrt(pairwise_distance(Z)[triu])
-    sr = adjacency_to_dyads(s + r.T, n_nodes)
+    sr = s + r.T
+    
+    if include_covariates:
+        beta = np.array([-1., 1.])
+        X_dyad = rng.randn(n_nodes, n_nodes, 2)
+        sr += X_dyad @ beta
+    else:
+        beta = None
+        X_dyad = None
+    
+    sr = adjacency_to_dyads(sr, n_nodes)
     
     #recip_coef = rng.uniform(-1, 1) if recip_coef is None else recip_coef
     dist_coef = rng.uniform(-1, 1) if dist_coef is None else dist_coef
@@ -67,6 +78,7 @@ def generate_data(n_nodes=100, n_features=2, density=0.25, odds_ratio=2.,
             'c': c,
             's': s,
             'r': r,
+            'beta': beta,
             's_var': sigma_sr[0,0],
             'r_var': sigma_sr[1,1],
             'sr_corr': sigma_sr[0,1] / np.sqrt(sigma_sr[0,0] * sigma_sr[1,1]),
@@ -75,4 +87,4 @@ def generate_data(n_nodes=100, n_features=2, density=0.25, odds_ratio=2.,
             'probas': probas
     }
 
-    return Y, params
+    return Y, X_dyad, params
