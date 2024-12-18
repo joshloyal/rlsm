@@ -10,7 +10,8 @@ from .network_utils import dyads_to_vec
 
 
 def to_probs(recip_coef, sr, dist, dist_coef, reciprocity_type='distance'):
-    probas = softmax(to_logits(recip_coef, sr, dist, dist_coef, reciprocity_type), axis=-1)
+    probas = softmax(
+        to_logits(recip_coef, sr, dist, dist_coef, reciprocity_type), axis=-1)
     return dyads_to_vec(
             jnp.c_[probas[:, 0] + probas[:, 1], probas[:, 0] + probas[:, 2]])  
 
@@ -34,4 +35,5 @@ class BivariateBernoulli(dist.MultinomialLogits):
                               [1., 0.],
                               [0., 1.],
                               [0., 0.]])
-        return dyads_to_vec(jnp.take(dyad_map, jnp.argmax(y_obs, axis=1), axis=0)) 
+        return dyads_to_vec(
+                jnp.take(dyad_map, jnp.argmax(y_obs, axis=1), axis=0)) 

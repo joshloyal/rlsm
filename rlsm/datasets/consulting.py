@@ -18,7 +18,6 @@ def load_consulting():
 
 
     Y = nx.to_numpy_array(g, sorted(g.nodes()), weight='weight')
-    #Y = (Y >= 3).astype(int)
     Y = (Y > 3).astype(int)
     
     locations = np.loadtxt(join(dir_path, 'consulting-location.txt'))

@@ -17,7 +17,8 @@ def pairwise_distance(U):
 
 def find_intercept(recip_coef, ab, distances, dist_coef, target_density):
     def density_func(intercept):
-        return to_probs(recip_coef, intercept + ab, distances, dist_coef).mean() - target_density
+        return (to_probs(recip_coef, intercept + ab, distances, dist_coef).mean() 
+                    - target_density)
 
     return root_scalar(density_func, bracket=[-10, 10]).root
 
@@ -64,7 +65,8 @@ def generate_data(n_nodes=100, n_features=2, density=0.25, odds_ratio=2.,
     #recip_coef = rng.uniform(-1, 1) if recip_coef is None else recip_coef
     dist_coef = rng.uniform(-1, 1) if dist_coef is None else dist_coef
 
-    recip_coef = rng.uniform(-1, 1) if odds_ratio is None else find_odds_ratio(dist_coef, distances, odds_ratio) 
+    recip_coef = (rng.uniform(-1, 1) if odds_ratio is None 
+            else find_odds_ratio(dist_coef, distances, odds_ratio))
     edge_coef = find_intercept(recip_coef, sr, distances, dist_coef, density)
 
     logits = to_logits(recip_coef, edge_coef + sr, distances, dist_coef)
