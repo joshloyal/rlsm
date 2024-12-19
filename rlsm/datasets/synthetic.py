@@ -31,7 +31,7 @@ def find_odds_ratio(dist_coef, distances, target):
 
 
 def generate_data(n_nodes=100, n_features=2, density=0.25, odds_ratio=2.,
-                  mu=1, include_covariates=False, 
+                  mu=1, include_covariates=True, 
                   dist_coef=None, random_state=42):
     rng = check_random_state(random_state)
     key = PRNGKey(random_state)
@@ -80,7 +80,7 @@ def generate_data(n_nodes=100, n_features=2, density=0.25, odds_ratio=2.,
             'c': c,
             's': s,
             'r': r,
-            'beta': beta,
+            'beta_dyad': beta,
             's_var': sigma_sr[0,0],
             'r_var': sigma_sr[1,1],
             'sr_corr': sigma_sr[0,1] / np.sqrt(sigma_sr[0,0] * sigma_sr[1,1]),
