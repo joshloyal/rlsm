@@ -26,8 +26,7 @@ X_dyad.shape
 # NOTE: reciprocity_type : str {'none', 'constant', 'distance'}
 lsm = ReciprocityLSM(n_features=2, reciprocity_type='distance', random_state=42)
 
-# run the MCMC algorithm for 1,000 warmup iterations and collect 1,000 post warmup samples
-# NOTE: Typically more warmup iterations and post-warmup samples should be collected
+# run the MCMC algorithm for 2,500 warmup iterations and collect 2,500 post warmup samples
 lsm.sample(Y, X_dyad=X_dyad, n_warmup=2500, n_samples=2500)
 
 # summary of the posterior distribution
