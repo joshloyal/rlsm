@@ -115,7 +115,7 @@ ax.set_ylabel('Latent Dimension 2', fontsize=18)
 ax.set_xlabel('Latent Dimension 1', fontsize=18)
 ```
 
-<img src="images/lawyer_embed.png" width="100%" />
+<img src="images/lawyer_embed.png" width="50%" />
 
 Simulation Studies and Real-Data Applications
 ---------------------------------------------
