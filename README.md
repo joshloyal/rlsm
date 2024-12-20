@@ -87,7 +87,7 @@ lsm.print_summary()
 lsm.plot(figsize=(12, 9))
 ```
 
-<img src="images/lawyer_plot.png" width="100%" />
+<img src="images/lawyer_lsm.png" width="100%" />
 
 
 Simulation Studies and Real-Data Applications
