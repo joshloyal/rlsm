@@ -166,9 +166,7 @@ def rlsm(Y, X_dyad, n_nodes, n_features=2,
     # reciprocity
     if reciprocity_type in ['distance', 'constant']:
         recip_coef = numpyro.sample("recip_coef", dist.Normal(0., 10.))  
-        #recip_coef = numpyro.sample("recip_coef", dist.Normal(0., 2.))  
         if reciprocity_type == 'distance':
-            #dist_coef = numpyro.sample('dist_coef', dist.Normal(0., 2.))
             dist_coef = numpyro.sample('dist_coef', dist.Normal(0., 10.))
         else:
             dist_coef = 0.
