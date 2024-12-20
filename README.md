@@ -2,7 +2,7 @@
 
 ## A Latent Space Approach to Inferring Distance-Dependent Reciprocity 
 
-*Author: [Joshua D. Loyal](https://joshloyal.github.io/) and Xiangyu Wu*
+*Package Authors: [Joshua D. Loyal](https://joshloyal.github.io/) and Xiangyu Wu*
 
 This package provides an interface for the model described in
 "A Latent Space Approach to Inferring Distance-Dependent Reciprocity in Directed Networks." Inference is performed using
@@ -22,7 +22,6 @@ pip install -r requirements.txt
 
 Installation
 ------------
-You need a working installation of numpy, scipy, and Cython to install ``splinetlsm``. In addition, the package uses the GNU Scientific Library (GSL), so you will need a C/C++ compiler and GLS installed on your system. It may be necessary to edit the `setup.py` file to point to the location of the GSL library. Install these required dependencies before proceeding.  Use the following commands to get the copy from GitHub and install all the dependencies:
 
 You need a working installation of numpy, scipy, and jax to install ``rlsm``. Install these required dependencies before proceeding.  Use the following commands to get the copy from GitHub and install all the dependencies:
 
@@ -30,7 +29,7 @@ You need a working installation of numpy, scipy, and jax to install ``rlsm``. In
 >>> git clone https://github.com/joshloyal/rlsm.git
 >>> cd rlsm
 >>> pip install -r requirements.txt
->>> python setup.py install
+>>> python setup.py develop
 ```
 
 Example
