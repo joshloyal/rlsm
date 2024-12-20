@@ -64,24 +64,25 @@ X_dyad.shape
 # NOTE: reciprocity_type : str {'none', 'constant', 'distance'}
 lsm = ReciprocityLSM(n_features=2, reciprocity_type='distance', random_state=42)
 
-# run the MCMC algorithm for 1,000 warmup iterations and collect 1,000 post warmup samples
-# NOTE: More warmup iterations and post-warmup samples should be collected!
-lsm.sample(Y, X_dyad=X_dyad, n_warmup=1000, n_samples=1000)
+# run the MCMC algorithm for 2,500 warmup iterations and collect 2,500 post warmup samples
+lsm.sample(Y, X_dyad=X_dyad, n_warmup=2500, n_samples=2500)
+
+#>>> sample: 100%|█████████████████████████████████████████████████████████████████████████████| 5000/5000 [03:46<00:00, 22.07it/s, 63 steps of size 4.81e-02. acc. prob=0.85]
 
 # summary of the posterior distribution
 lsm.print_summary()
 
-#>>> AUC: 0.938, AIC: 2955.982, BIC: 4631.574, DIC: 2830.108
+#>>> AUC: 0.938, AIC: 2968.120, BIC: 4643.712, DIC: 2826.027
 #>>> 
 #>>>                   mean       std    median      2.5%     97.5%     n_eff     r_hat
-#>>> beta_dyad[0]      0.51      0.15      0.51      0.21      0.79    832.92      1.00
-#>>> beta_dyad[1]      1.79      0.13      1.79      1.55      2.08    795.70      1.00
-#>>>    dist_coef     -0.10      0.19     -0.09     -0.48      0.26    321.51      1.00
-#>>>        r_var      2.55      0.57      2.49      1.50      3.67    281.57      1.02
-#>>>   recip_coef      0.96      0.45      0.98     -0.00      1.72    328.63      1.00
-#>>>        s_var      2.27      0.58      2.19      1.32      3.49    212.63      1.00
-#>>>      sr_corr     -0.51      0.18     -0.50     -0.89     -0.19    200.04      1.01
-#>>>        z_var      4.65      0.88      4.59      2.97      6.26    338.39      1.02
+#>>> beta_dyad[0]      0.51      0.14      0.51      0.25      0.79   2173.26      1.00
+#>>> beta_dyad[1]      1.78      0.13      1.78      1.51      2.01   1998.57      1.00
+#>>>    dist_coef     -0.12      0.20     -0.10     -0.50      0.25    530.26      1.00
+#>>>        r_var      2.50      0.63      2.43      1.36      3.75    398.81      1.00
+#>>>   recip_coef      1.01      0.44      0.99      0.17      1.84    653.70      1.00
+#>>>        s_var      2.26      0.55      2.19      1.29      3.36    601.05      1.00
+#>>>      sr_corr     -0.53      0.20     -0.53     -0.92     -0.15    338.35      1.01
+#>>>        z_var      4.60      0.83      4.51      3.06      6.22    772.34      1.00
 
 # diagnostic plots
 lsm.plot(figsize=(12, 9))
