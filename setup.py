@@ -17,11 +17,6 @@ exec(open(os.path.join(HERE, 'rlsm', 'version.py')).read())
 with open('requirements.txt') as f:
     INSTALL_REQUIRES = [l.strip() for l in f.readlines() if l]
 
-
-with open('test_requirements.txt') as f:
-    TEST_REQUIRES = [l.strip() for l in f.readlines() if l]
-
-
 try:
     import numpy
 except ImportError:
